@@ -44,8 +44,13 @@ giant names. This will be assigned as the GameReplicationInfo's NameListDef in e
 ItemPool: Optional[UObject]
 """The ItemPoolDefinition object from which giants item drops are selected."""
 
+
 _giants: Set[UObject]
 """A set used to record WillowAIPawns that have been selected for gigantism."""
+
+
+_cheat_mode: bool
+"""Whether or not we are currently in cheat mode."""
 
 
 def _prepare_lists() -> None:
@@ -148,9 +153,7 @@ def _initialized_balance(caller: UObject, function: UFunction, params: FStruct) 
     # Roll whether or not this pawn will be a giant. Use 6 bits of randomness (1 in 64) if the pawn
     # is a badasses, otherwise 8 bits (1 in 256).
     roll = getrandbits(6 if params.BalanceDefinition.Champion else 8)
-    # roll = getrandbits(1) # 50% chance
-    # roll = 0 # 100% chance
-    if roll == 0:
+    if roll == 0 or _cheat_mode:
         _giants.add(caller)
 
         # Clone the pawn's AI class, and iterate over its starting values to alter its health,
@@ -298,82 +301,98 @@ def _died(caller: UObject, function: UFunction, params: FStruct) -> bool:
     return True
 
 
+# @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+def _console_command(caller: UObject, function: UFunction, params: FStruct):
+    if params.Command != "giantscheat":
+        return True
+
+    global _cheat_mode
+    _cheat_mode = not _cheat_mode
+    Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
+    return False
+
+
 class ReignOfGiants(ModMenu.SDKMod):
-  Name: str = "Reign Of Giants"
-  Version: str = "1.0"
-  Description: str = "Encounter rare, gigantic variants of enemies throughout the Borderlands."
-  Author: str = "mopioid"
-  Types: ModTypes = ModTypes.Gameplay
-  SupportedGames: ModMenu.Game = ModMenu.Game.BL2
+    Name: str = "Reign Of Giants"
+    Version: str = "1.0"
+    Description: str = "Encounter rare, gigantic variants of enemies throughout the Borderlands."
+    Author: str = "mopioid"
+    Types: ModTypes = ModTypes.Gameplay
+    SupportedGames: ModMenu.Game = ModMenu.Game.BL2
 
-  SaveEnabledState: ModMenu.EnabledSaveType = ModMenu.EnabledSaveType.LoadOnMainMenu
+    SaveEnabledState: ModMenu.EnabledSaveType = ModMenu.EnabledSaveType.LoadOnMainMenu
 
-  def __init__(self):
-      ModMenu.LoadModSettings(self)
+    def __init__(self):
+        ModMenu.LoadModSettings(self)
 
-  def Enable(self):
+    def Enable(self):
 
-    global _package
-    _package = FindObject("Package", "ReignOfGiants")
-    if _package is None:
-        _package = ConstructObject("Package", Name="ReignOfGiants", Outer=None)
-        KeepAlive(_package)
+        global _package
+        _package = FindObject("Package", "ReignOfGiants")
+        if _package is None:
+            _package = ConstructObject("Package", Name="ReignOfGiants", Outer=None)
+            KeepAlive(_package)
 
-    global _name_list_def
-    _name_list_def = FindObject("NameListDefinition", "ReignOfGiants.NameList")
-    if _name_list_def is None:
-        _name_list_def = ConstructObject("NameListDefinition", _package, "NameList")
-        KeepAlive(_name_list_def)
+        global _name_list_def
+        _name_list_def = FindObject("NameListDefinition", "ReignOfGiants.NameList")
+        if _name_list_def is None:
+            _name_list_def = ConstructObject("NameListDefinition", _package, "NameList")
+            KeepAlive(_name_list_def)
 
-    global ItemPool
-    ItemPool = FindObject("ItemPoolDefinition", "ReignOfGiants.ItemPool")
-    if ItemPool is None:
-        ItemPool = ConstructObject("ItemPoolDefinition", _package, "ItemPool")
-        KeepAlive(ItemPool)
+        global ItemPool
+        ItemPool = FindObject("ItemPoolDefinition", "ReignOfGiants.ItemPool")
+        if ItemPool is None:
+            ItemPool = ConstructObject("ItemPoolDefinition", _package, "ItemPool")
+            KeepAlive(ItemPool)
 
-    balanced_items = []
+        global _cheat_mode
+        _cheat_mode = False
 
-    for pool, weight in [
-        ( "GD_Itempools.WeaponPools.Pool_Weapons_All_06_Legendary",                4 ),
-        ( "GD_Lobelia_Itempools.WeaponPools.Pool_Lobelia_Pearlescent_Weapons_All", 4 ),
-        ( "GD_Lobelia_Itempools.ClassModPools.Pool_ClassMod_Lobelia_All",          3 ),
-        ( "GD_Itempools.ClassModPools.Pool_ClassMod_06_Legendary",                 1 ),
-        ( "GD_Itempools.ShieldPools.Pool_Shields_All_06_Legendary",                2 ),
-        ( "GD_Itempools.GrenadeModPools.Pool_GrenadeMods_06_Legendary",            2 ),
-    ]:
-        # As the SDK cannot assign arrays of FStructs with null objects, we must use a console command
-        # to set our pools as the ItemPoolDefinition's BalancedItems.
-        probability = f"(BaseValueConstant={weight},BaseValueScaleConstant=1)"
-        balanced_item = f"(ItmPoolDefinition={pool},Probability={probability},bDropOnDeath=True)"
-        balanced_items.append(balanced_item)
+        balanced_items = []
 
-    balanced_items = f"set ReignOfGiants.ItemPool BalancedItems ({','.join(balanced_items)})"
-    GetEngine().GamePlayers[0].Actor.ConsoleCommand(balanced_items, False)
+        for pool, weight in [
+            ( "GD_Itempools.WeaponPools.Pool_Weapons_All_06_Legendary",                4 ),
+            ( "GD_Lobelia_Itempools.WeaponPools.Pool_Lobelia_Pearlescent_Weapons_All", 4 ),
+            ( "GD_Lobelia_Itempools.ClassModPools.Pool_ClassMod_Lobelia_All",          3 ),
+            ( "GD_Itempools.ClassModPools.Pool_ClassMod_06_Legendary",                 1 ),
+            ( "GD_Itempools.ShieldPools.Pool_Shields_All_06_Legendary",                2 ),
+            ( "GD_Itempools.GrenadeModPools.Pool_GrenadeMods_06_Legendary",            2 ),
+        ]:
+            # As the SDK cannot assign arrays of FStructs with null objects, we must use a console command
+            # to set our pools as the ItemPoolDefinition's BalancedItems.
+            probability = f"(BaseValueConstant={weight},BaseValueScaleConstant=1)"
+            balanced_item = f"(ItmPoolDefinition={pool},Probability={probability},bDropOnDeath=True)"
+            balanced_items.append(balanced_item)
 
-    RunHook("Engine.Pawn.InitializeBalanceDefinitionState", "ReignOfGiants", _initialized_balance)
-    RunHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants", _replicated_event)
-    RunHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants", _behavior_transform)
-    RunHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants", _died)
+        balanced_items = f"set ReignOfGiants.ItemPool BalancedItems ({','.join(balanced_items)})"
+        GetEngine().GamePlayers[0].Actor.ConsoleCommand(balanced_items, False)
 
-  def Disable(self):
-    RemoveHook("Engine.Pawn.InitializeBalanceDefinitionState", "ReignOfGiants")
-    RemoveHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants")
-    RemoveHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants")
-    RemoveHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants")
+        RunHook("Engine.Pawn.InitializeBalanceDefinitionState", "ReignOfGiants", _initialized_balance)
+        RunHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants", _replicated_event)
+        RunHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants", _behavior_transform)
+        RunHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants", _died)
+        RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
 
-    global _package
-    _package.ObjectFlags.A &= ~0x4000
-    _package = None
+    def Disable(self):
+        RemoveHook("Engine.Pawn.InitializeBalanceDefinitionState", "ReignOfGiants")
+        RemoveHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants")
+        RemoveHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants")
+        RemoveHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants")
+        RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
 
-    global _name_list_def
-    _name_list_def.ObjectFlags.A &= ~0x4000
-    _name_list_def = None
+        global _package
+        _package.ObjectFlags.A &= ~0x4000
+        _package = None
 
-    global ItemPool
-    ItemPool.ObjectFlags.A &= ~0x4000
-    ItemPool = None
+        global _name_list_def
+        _name_list_def.ObjectFlags.A &= ~0x4000
+        _name_list_def = None
 
-    GetEngine().GamePlayers[0].Actor.ConsoleCommand("obj garbage", False)
+        global ItemPool
+        ItemPool.ObjectFlags.A &= ~0x4000
+        ItemPool = None
+
+        GetEngine().GamePlayers[0].Actor.ConsoleCommand("obj garbage", False)
 
 
 ModMenu.RegisterMod(ReignOfGiants())

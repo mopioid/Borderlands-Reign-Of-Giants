@@ -9,7 +9,7 @@ Yes, __every__ enemy in the game! In *Reign Of Giants*, Psychos, Loaders, Saturn
 
 Upon encountering a Giant, you will be faced with an enemy notably stronger than the common variant, but will be appropriately rewarded. In addition to more XP, Giants drop a guaranteed item from a specialized loot pool.
 
-*Reign Of Giants* has the additional benefit of compatibility. It will work (almost entirely) in co-op, so long as both players are running the mod. It will also work along side other mods, including enemy mods such as Enemy Randomizer and Spawn Multiplier. Currently only Borderlands 2 is supported, however TPS support is planned.
+*Reign Of Giants* has the additional benefit of compatibility. It will work in co-op, so long as both players are running the mod. It will also work along side other mods, including enemy mods such as Enemy Randomizer and Spawn Multiplier. Currently only Borderlands 2 is supported, however TPS support is planned.
 
 ...Was every enemy mentioned enough? Every. Enemy. Plus a few easter eggs. Happy Hunting! (Also, please tag me with screenshots of your best Giants.)
 
