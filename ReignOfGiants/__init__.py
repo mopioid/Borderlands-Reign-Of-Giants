@@ -1,6 +1,6 @@
 from unrealsdk import *
 from Mods import ModMenu
-from Mods.ModMenu import Hook
+# from Mods.ModMenu import Hook
 
 from random import getrandbits
 from typing import Optional, Set
