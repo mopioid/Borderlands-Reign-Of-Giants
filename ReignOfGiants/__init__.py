@@ -5,6 +5,11 @@ from Mods import ModMenu
 from random import getrandbits
 from typing import Optional, Set
 
+try:
+    from Mods import CommandExtensions
+except ImportError:
+    CommandExtensions = None
+
 """
 TODO: Client pawn transformations
 TODO: Adjust HUD targeting
@@ -49,7 +54,7 @@ _giants: Set[UObject]
 """A set used to record WillowAIPawns that have been selected for gigantism."""
 
 
-_cheat_mode: bool
+_cheat_mode: bool = False
 """Whether or not we are currently in cheat mode."""
 
 
@@ -115,6 +120,14 @@ def _giantize(pawn: UObject) -> None:
     pawn.NameListIndex = len(names)
     names.append(_generate_name(pawn))
     _name_list_def.Names = names
+
+
+def _toggle_cheat_mode() -> None:
+    """ Toggle cheat mode and log a message to console. """
+    global _cheat_mode
+    _cheat_mode = not _cheat_mode
+    Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
+
 
 
 _blacklisted_ai = [
@@ -301,15 +314,13 @@ def _died(caller: UObject, function: UFunction, params: FStruct) -> bool:
     return True
 
 
-# @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
-def _console_command(caller: UObject, function: UFunction, params: FStruct):
-    if params.Command != "giantscheat":
-        return True
-
-    global _cheat_mode
-    _cheat_mode = not _cheat_mode
-    Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
-    return False
+if CommandExtensions is None:
+    # @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+    def _console_command(caller: UObject, function: UFunction, params: FStruct):
+        if params.Command != "giantscheat":
+            return True
+        _toggle_cheat_mode()
+        return False
 
 
 class ReignOfGiants(ModMenu.SDKMod):
@@ -371,14 +382,20 @@ class ReignOfGiants(ModMenu.SDKMod):
         RunHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants", _replicated_event)
         RunHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants", _behavior_transform)
         RunHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants", _died)
-        RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
+        if CommandExtensions is None:
+            RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
+        else:
+            CommandExtensions.RegisterConsoleCommand("giantscheat", lambda args: _toggle_cheat_mode())
 
     def Disable(self):
         RemoveHook("Engine.Pawn.InitializeBalanceDefinitionState", "ReignOfGiants")
         RemoveHook("WillowGame.WillowAIPawn.ReplicatedEvent", "ReignOfGiants")
         RemoveHook("WillowGame.Behavior_Transform.ApplyBehaviorToContext", "ReignOfGiants")
         RemoveHook("WillowGame.WillowAIPawn.Died", "ReignOfGiants")
-        RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+        if CommandExtensions is None:
+            RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+        else:
+            CommandExtensions.UnregisterConsoleCommand("giantscheat")
 
         global _package
         _package.ObjectFlags.A &= ~0x4000
