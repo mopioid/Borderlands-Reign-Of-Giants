@@ -859,18 +859,62 @@ def _died(caller: UObject, function: UFunction, params: FStruct) -> bool:
 
 
 def _toggle_cheat_mode() -> None:
-    """ Toggle cheat mode and log a message to console. """
+    """Toggle cheat mode and log a message to console."""
     global _cheat_mode
     _cheat_mode = not _cheat_mode
     Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
 
+
+def _edit_giant_scale(arguments: Sequence[Any]) -> None:
+    """Set the scale for Giants and log a message to console."""
+    global GiantScale
+
+    try:
+        if isinstance(arguments, list):
+            size = float(arguments[0])
+        else:
+            size = float(arguments.size)
+    except (IndexError, ValueError):
+        Log("Must specify a valid number, e.g.: giantssize 0.5")
+        return
+
+    GiantScale = size
+    Log(f"Reign Of Giants Giant Size: {size}")
+
+
+def _edit_giant_prefix(arguments: Sequence[Any]) -> None:
+    """Set the name prefix for Giants and log a message to console."""
+    global GiantPrefix
+
+    try:
+        if isinstance(arguments, list):
+            name = arguments[0]
+        else:
+            name = arguments.name
+    except (IndexError, ValueError):
+        Log("Must specify a valid number, e.g.: giantssize 0.5")
+        return
+
+    GiantPrefix = name
+    Log(f"Reign Of Giants Giant Name: {name}")
+
+
 if CommandExtensions is None:
     # @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
     def _console_command(caller: UObject, function: UFunction, params: FStruct):
-        if params.Command != "giantscheat":
-            return True
-        _toggle_cheat_mode()
-        return False
+        command, *arguments = params.Command.split(maxsplit=1)
+
+        if command == "giantscheat":
+            _toggle_cheat_mode()
+            return False
+        elif command == "giantssize":
+            _edit_giant_scale(arguments)
+            return False
+        elif command == "giantsname":
+            _edit_giant_prefix(arguments)
+            return False
+
+        return True
 
 
 class ReignOfGiants(ModMenu.SDKMod):
@@ -1005,6 +1049,7 @@ class ReignOfGiants(ModMenu.SDKMod):
             _early_pool, _early_pool, _early_pool, _early_pool, _early_pool,
         )))
 
+        # Register our hooks.
         RunHook( "WillowGame.WillowAIPawn.PostBeginPlay",                                   "ReignOfGiants", _aipawn_post_begin_play       )
         RunHook( "WillowGame.PopulationFactoryBalancedAIPawn.SetupBalancedPopulationActor", "ReignOfGiants", _setup_balanced_population    )
         RunHook( "Engine.Pawn.ApplyBalanceDefinitionCustomizations",                        "ReignOfGiants", _apply_balance_customizations )
@@ -1016,10 +1061,26 @@ class ReignOfGiants(ModMenu.SDKMod):
         if CommandExtensions is None:
             RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
         else:
-            CommandExtensions.RegisterConsoleCommand("giantscheat", lambda args: _toggle_cheat_mode())
+            CommandExtensions.RegisterConsoleCommand(
+                name = "giantscheat",
+                callback = lambda args: _toggle_cheat_mode(),
+                splitter = lambda args: [args]
+            ).add_argument("void")
 
-            
-def Disable(self) -> None:
+            CommandExtensions.RegisterConsoleCommand(
+                name = "giantssize",
+                callback = lambda args: _edit_giant_scale(args),
+                splitter = lambda args: [args]
+            ).add_argument("size")
+
+            CommandExtensions.RegisterConsoleCommand(
+                name = "giantsname",
+                callback = lambda args: _edit_giant_prefix(args),
+                splitter = lambda args: [args]
+            ).add_argument("name")
+
+
+    def Disable(self) -> None:
         super().Disable()
 
         global _package, _name_list, LootBehavior
@@ -1048,6 +1109,8 @@ def Disable(self) -> None:
             RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
         else:
             CommandExtensions.UnregisterConsoleCommand("giantscheat")
+            CommandExtensions.UnregisterConsoleCommand("giantssize")
+            CommandExtensions.UnregisterConsoleCommand("giantsname")
 
         RemoveHook( "WillowGame.WillowGameViewportClient.Tick", "ReignOfGiants.RequestGiants"  )
         RemoveHook( "WillowGame.WillowGameViewportClient.Tick", "ReignOfGiants.UpdatePawns"    )
