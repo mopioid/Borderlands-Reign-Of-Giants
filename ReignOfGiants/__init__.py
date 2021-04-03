@@ -10,6 +10,11 @@ from time import time
 
 from typing import Dict, Generator, Iterable, List, Optional, Tuple, Union
 
+try:
+    from Mods import CommandExtensions
+except ImportError:
+    CommandExtensions = None
+
 """
 TODO: Offhost Axton's turret 
 
@@ -853,14 +858,19 @@ def _died(caller: UObject, function: UFunction, params: FStruct) -> bool:
     return True
 
 
-# @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants")
-def _console_command(caller: UObject, function: UFunction, params: FStruct):
-    if params.Command != "giantscheat":
-        return True
-
+def _toggle_cheat_mode() -> None:
+    """ Toggle cheat mode and log a message to console. """
+    global _cheat_mode
     _cheat_mode = not _cheat_mode
     Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
-    return False
+
+if CommandExtensions is None:
+    # @Hook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+    def _console_command(caller: UObject, function: UFunction, params: FStruct):
+        if params.Command != "giantscheat":
+            return True
+        _toggle_cheat_mode()
+        return False
 
 
 class ReignOfGiants(ModMenu.SDKMod):
@@ -1002,10 +1012,14 @@ class ReignOfGiants(ModMenu.SDKMod):
         RunHook( "WillowGame.WillowAIPawn.AILevelUp",                                       "ReignOfGiants", _ai_level_up                  )
         RunHook( "WillowGame.Behavior_Transform.ApplyBehaviorToContext",                    "ReignOfGiants", _behavior_transform           )
         RunHook( "WillowGame.WillowAIPawn.Died",                                            "ReignOfGiants", _died                         )
-        RunHook( "Engine.PlayerController.ConsoleCommand",                                  "ReignOfGiants", _console_command              )
 
+        if CommandExtensions is None:
+            RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
+        else:
+            CommandExtensions.RegisterConsoleCommand("giantscheat", lambda args: _toggle_cheat_mode())
 
-    def Disable(self) -> None:
+            
+def Disable(self) -> None:
         super().Disable()
 
         global _package, _name_list, LootBehavior
@@ -1029,7 +1043,11 @@ class ReignOfGiants(ModMenu.SDKMod):
         RemoveHook( "WillowGame.WillowAIPawn.AILevelUp",                                       "ReignOfGiants" )
         RemoveHook( "WillowGame.Behavior_Transform.ApplyBehaviorToContext",                    "ReignOfGiants" )
         RemoveHook( "WillowGame.WillowAIPawn.Died",                                            "ReignOfGiants" )
-        RemoveHook( "Engine.PlayerController.ConsoleCommand",                                  "ReignOfGiants" )
+
+        if CommandExtensions is None:
+            RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+        else:
+            CommandExtensions.UnregisterConsoleCommand("giantscheat")
 
         RemoveHook( "WillowGame.WillowGameViewportClient.Tick", "ReignOfGiants.RequestGiants"  )
         RemoveHook( "WillowGame.WillowGameViewportClient.Tick", "ReignOfGiants.UpdatePawns"    )
