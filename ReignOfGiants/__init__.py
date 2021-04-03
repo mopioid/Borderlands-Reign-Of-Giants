@@ -5,8 +5,6 @@ from Mods import ModMenu
 from Mods.ModMenu import ClientMethod, ServerMethod
 
 from random import getrandbits
-from dataclasses import dataclass
-from time import time
 
 from typing import Dict, Generator, Iterable, List, Optional, Tuple, Union
 
@@ -292,7 +290,7 @@ class aipawn:
         if force or _cheat_mode:
             roll = 0
         else:
-            roll = getrandbits(1)
+            roll = getrandbits(8)
             # No pawns that don't roll 0 through 3 will be selected for gigantism.
             if roll > 3:
                 return False
@@ -546,7 +544,7 @@ def _prepare_lists() -> Optional[bool]:
     If it has not yet been done in the current map, prepare the name list variables and set of
     WillowAIPawn subclasses.
     """
-    global _level_address, _giant_request_timeout
+    global _level_address
 
     # Get the current world info, and the address of the current level object.
     world_info = GetEngine().GetCurrentWorldInfo()
@@ -870,10 +868,7 @@ def _edit_giant_scale(arguments: Sequence[Any]) -> None:
     global GiantScale
 
     try:
-        if isinstance(arguments, list):
-            size = float(arguments[0])
-        else:
-            size = float(arguments.size)
+        size = float(arguments[0] if isinstance(arguments, list) else arguments.size)
     except (IndexError, ValueError):
         Log("Must specify a valid number, e.g.: giantssize 0.5")
         return
@@ -887,11 +882,8 @@ def _edit_giant_prefix(arguments: Sequence[Any]) -> None:
     global GiantPrefix
 
     try:
-        if isinstance(arguments, list):
-            name = arguments[0]
-        else:
-            name = arguments.name
-    except (IndexError, ValueError):
+        name = arguments[0] if isinstance(arguments, list) else arguments.name
+    except IndexError:
         Log("Must specify a valid number, e.g.: giantssize 0.5")
         return
 
