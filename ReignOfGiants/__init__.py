@@ -13,17 +13,18 @@ try:
 except ImportError:
     CommandExtensions = None
 
-"""
-TODO: Offhost Axton's turret 
 
+"""
 TODO: Consistent Giant health scaling
     Check pawn balance aiclass overrides?
 
 TODO: Adjust loot drop point to prevent floor clipping
-    turrets
+    turrets (and Bullymongs?)
 
 TODO: Adjust HUD targeting
     Varkids
+
+TODO: Correct client giant naming regardless of latency.
 """
 
 
@@ -287,7 +288,7 @@ class aipawn:
 
         # Unless we are in cheat mode or were told to force a giant, We roll 8 bits (1 in 256) to
         # determine whether the pawn will be a giant or not.
-        if force or _cheat_mode:
+        if force or CheatMode.CurrentValue:
             roll = 0
         else:
             roll = getrandbits(8)
@@ -323,8 +324,11 @@ class aipawn:
 
     def gigantize(self):
         """Growwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"""
-        if self.uobject.Mesh is not None:
-            self.uobject.Mesh.Scale3D = (GiantScale, GiantScale, GiantScale)
+        if self.uobject.Mesh is None:
+            return
+
+        self.uobject.Mesh.Scale3D = (GiantScale.CurrentValue, GiantScale.CurrentValue, GiantScale.CurrentValue)
+        self.uobject.MovementSpeedModifier *= 1 + (GiantScale.CurrentValue - 1) * 0.67
 
 
     @property
@@ -385,7 +389,7 @@ class aipawn:
             return None
 
         # Before we potentially format this name for a pet presentation, prefix it.
-        name = f"{GiantPrefix} {name}"
+        name = f"{GiantPrefix.CurrentValue} {name}"
 
         if self.uobject.PlayerMasterPRI is not None:
             masterName = self.uobject.PlayerMasterPRI.GetHumanReadableName()
@@ -470,15 +474,24 @@ LootBehavior: Optional[UObject]
 """The Behavior_SpawnLootAroundPoint object which spawns loot on Giants' death."""
 
 
-GiantPrefix: str = "Giant"
-"""The string to prepend to the name of each Giant selected for Gigantism."""
+GiantPrefix: ModMenu.Options.Hidden = ModMenu.Options.Hidden(
+    Caption="GiantPrefix",
+    StartingValue="Giant"
+)
+"""The SDK Options object that stores the string which is prepended to each Giants' name."""
 
-GiantScale: float = 2.25
-"""The multiplier by which to scale Giant's meshes."""
+GiantScale: ModMenu.Options.Hidden = ModMenu.Options.Hidden(
+    Caption="GiantScale",
+    StartingValue=2.25
+)
+"""The SDK Options object that stores the float used to scale Giants' meshes."""
 
 
-_cheat_mode: bool = False
-"""Whether or not we are currently in cheat mode."""
+CheatMode: ModMenu.Options.Hidden = ModMenu.Options.Hidden(
+    Caption="CheatMode",
+    StartingValue=False
+)
+"""The SDK Options object that stores whether to use cheat mode."""
 
 
 """
@@ -858,37 +871,29 @@ def _died(caller: UObject, function: UFunction, params: FStruct) -> bool:
 
 def _toggle_cheat_mode() -> None:
     """Toggle cheat mode and log a message to console."""
-    global _cheat_mode
-    _cheat_mode = not _cheat_mode
-    Log("Reign Of Giants Cheat Mode: " + ("On" if _cheat_mode else "Off"))
+    CheatMode.CurrentValue = not CheatMode.CurrentValue
+    ModMenu.SaveModSettings(_mod_instance)
+    Log("Reign Of Giants Cheat Mode: " + ("On" if CheatMode.CurrentValue else "Off"))
 
 
 def _edit_giant_scale(arguments: Sequence[Any]) -> None:
     """Set the scale for Giants and log a message to console."""
-    global GiantScale
-
     try:
-        size = float(arguments[0] if isinstance(arguments, list) else arguments.size)
+        GiantScale.CurrentValue = float(arguments[0] if isinstance(arguments, list) else arguments.size)
+        ModMenu.SaveModSettings(_mod_instance)
+        Log(f"Reign Of Giants Giant Size: {GiantScale.CurrentValue}")
     except (IndexError, ValueError):
         Log("Must specify a valid number, e.g.: giantssize 0.5")
-        return
-
-    GiantScale = size
-    Log(f"Reign Of Giants Giant Size: {size}")
 
 
 def _edit_giant_prefix(arguments: Sequence[Any]) -> None:
     """Set the name prefix for Giants and log a message to console."""
-    global GiantPrefix
-
     try:
-        name = arguments[0] if isinstance(arguments, list) else arguments.name
+        GiantPrefix.CurrentValue = arguments[0] if isinstance(arguments, list) else arguments.name
+        ModMenu.SaveModSettings(_mod_instance)
+        Log(f"Reign Of Giants Giant Name: {GiantPrefix.CurrentValue}")
     except IndexError:
-        Log("Must specify a valid number, e.g.: giantssize 0.5")
-        return
-
-    GiantPrefix = name
-    Log(f"Reign Of Giants Giant Name: {name}")
+        Log("Must specify a name, e.g.: giantsname Teensie Weensie")
 
 
 if CommandExtensions is None:
@@ -919,6 +924,7 @@ class ReignOfGiants(ModMenu.SDKMod):
 
     SaveEnabledState: ModMenu.EnabledSaveType = ModMenu.EnabledSaveType.LoadOnMainMenu
 
+    Options: List[ModMenu.Options.Base] = [GiantPrefix, GiantScale, CheatMode]
 
     @ServerMethod
     def ServerRequestGiants(self, PC: UObject = None) -> None:
@@ -1051,7 +1057,7 @@ class ReignOfGiants(ModMenu.SDKMod):
         RunHook( "WillowGame.WillowAIPawn.Died",                                            "ReignOfGiants", _died                         )
 
         if CommandExtensions is None:
-            RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand", _console_command)
+            RunHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants", _console_command)
         else:
             CommandExtensions.RegisterConsoleCommand(
                 name = "giantscheat",
@@ -1098,7 +1104,7 @@ class ReignOfGiants(ModMenu.SDKMod):
         RemoveHook( "WillowGame.WillowAIPawn.Died",                                            "ReignOfGiants" )
 
         if CommandExtensions is None:
-            RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants.ConsoleCommand")
+            RemoveHook("Engine.PlayerController.ConsoleCommand", "ReignOfGiants")
         else:
             CommandExtensions.UnregisterConsoleCommand("giantscheat")
             CommandExtensions.UnregisterConsoleCommand("giantssize")
