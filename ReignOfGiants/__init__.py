@@ -916,7 +916,7 @@ if CommandExtensions is None:
 
 class ReignOfGiants(ModMenu.SDKMod):
     Name: str = "Reign Of Giants"
-    Version: str = "1.1"
+    Version: str = "1.2"
     Description: str = "Encounter rare, gigantic variants of enemies throughout the Borderlands."
     Author: str = "mopioid"
     Types: ModTypes = ModTypes.Gameplay
